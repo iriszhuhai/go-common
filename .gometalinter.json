@@ -20,7 +20,8 @@
     "Concurrency": 2,
     "Skip": [
         "go",
-        "generated"
+        "generated",
+        "vendor"
     ],
     "Deadline": "3m"
 }

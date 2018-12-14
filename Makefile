@@ -5,8 +5,16 @@
 # POSTGRES_USER=docker
 # POSTGRES_PSWD=docker
 
+# This repo has Go "modules" with vendoring enabled.
+# The vendoring is to allow gometalinter to work correctly as not
+# all tooling and linters are compatible with modules. 
+
+# Enable module support in Go 1.11, might not need in 1.12
+GO111MODULE=on
+
 GOCMD=go
 GOGEN=$(GOCMD) generate
+GOMOD=$(GOCMD) mod 
 GORUN=$(GOCMD) run
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
@@ -17,6 +25,9 @@ GOCOVER=$(GOCMD) tool cover
 GO:=$(shell command -v go 2> /dev/null)
 # DOCKER:=$(shell command -v docker 2> /dev/null)
 APT:=$(shell command -v apt-get 2> /dev/null)
+
+GOMETALINTER_INSTALLER=scripts/gometalinter_install.sh
+GOMETALINTER_VERSION_TAG=v2.0.11
 
 ## Reliant on go and $GOPATH being set
 .PHONY: check-go-env
@@ -43,8 +54,12 @@ install-dep: check-go-env ## Installs dep
 
 .PHONY: install-linter
 install-linter: check-go-env ## Installs linter
-	@$(GOGET) -u github.com/alecthomas/gometalinter
-	@gometalinter --install
+	sh $(GOMETALINTER_INSTALLER) -b $(GOPATH)/bin $(GOMETALINTER_VERSION_TAG)
+
+	# Get the latest versions of these to get module support
+	GO111MODULE=off go get -u gitlab.com/opennota/check/cmd/varcheck
+	GO111MODULE=off go get -u gitlab.com/opennota/check/cmd/structcheck
+
 ifdef APT
 	@sudo apt-get install golang-race-detector-runtime || true
 endif
@@ -95,13 +110,18 @@ setup: check-go-env install-dep install-linter install-cover install-gorunpkg ##
 # 	@echo 'Postgres stopped'
 
 ## gometalinter config in .gometalinter.json
+.PHONY: vendor 
+vendor: ## Updates the vendor directory with go.mod dependencies
+	@$(GOMOD) vendor
+
+## gometalinter config in .gometalinter.json
 .PHONY: lint
 lint: ## Runs linting.
-	@gometalinter ./...
+	@GO111MODULE=off gometalinter ./...
 
 .PHONY: build
 build: ## Builds the repo, mainly to ensure all the files will build properly
-	$(GOBUILD) ./...
+	@$(GOBUILD) ./...
 
 .PHONY: test
 test: ## Runs unit tests and tests code coverage
